@@ -1,39 +1,63 @@
 const input = await Deno.readTextFile("./02-input.txt");
 
 const RESULT = {
-  WIN: "WIN",
   LOSE: "LOSE",
+  WIN: "WIN",
   DRAW: "DRAW",
-};
+} as const;
+
+const SHAPE = {
+  ROCK: "ROCK",
+  PAPER: "PAPER",
+  SCISSORS: "SCISSORS",
+} as const;
+
+type Shape = typeof SHAPE[keyof typeof SHAPE];
+
+const SHAPE_MAP = {
+  A: SHAPE.ROCK,
+  B: SHAPE.PAPER,
+  C: SHAPE.SCISSORS,
+} as const;
+
+type ShapeInput = keyof typeof SHAPE_MAP;
 
 const STRATEGY_MAP = {
   X: RESULT.LOSE,
   Y: RESULT.DRAW,
   Z: RESULT.WIN,
-};
+} as const;
 
-const SHAPE_VALUE = {
-  A: 1,
-  B: 2,
-  C: 3,
-};
+type StrategyInput = keyof typeof STRATEGY_MAP;
 
-const WIN_VALUE = {
-  LOSE: 0,
-  DRAW: 3,
-  WIN: 6,
-};
+const POINTS_BY_SHAPE = {
+  [SHAPE.ROCK]: 1,
+  [SHAPE.PAPER]: 2,
+  [SHAPE.SCISSORS]: 3,
+} as const;
 
-const RESULT_MATRIX = {
-  A: { A: RESULT.DRAW, B: RESULT.WIN, C: RESULT.LOSE },
-  B: { A: RESULT.LOSE, B: RESULT.DRAW, C: RESULT.WIN },
-  C: { A: RESULT.WIN, B: RESULT.LOSE, C: RESULT.DRAW },
-};
+const POINTS_BY_RESULT = {
+  [RESULT.LOSE]: 0,
+  [RESULT.DRAW]: 3,
+  [RESULT.WIN]: 6,
+} as const;
 
-const WIN_MATRIX = {
-  A: { A: WIN_VALUE.DRAW, B: WIN_VALUE.LOSE, C: WIN_VALUE.WIN },
-  B: { A: WIN_VALUE.WIN, B: WIN_VALUE.DRAW, C: WIN_VALUE.LOSE },
-  C: { A: WIN_VALUE.LOSE, B: WIN_VALUE.WIN, C: WIN_VALUE.DRAW },
+const SHAPE_BY_STRATEGY = {
+  [RESULT.LOSE]: {
+    [SHAPE.ROCK]: SHAPE.SCISSORS,
+    [SHAPE.PAPER]: SHAPE.ROCK,
+    [SHAPE.SCISSORS]: SHAPE.PAPER,
+  },
+  [RESULT.DRAW]: {
+    [SHAPE.ROCK]: SHAPE.ROCK,
+    [SHAPE.PAPER]: SHAPE.PAPER,
+    [SHAPE.SCISSORS]: SHAPE.SCISSORS,
+  },
+  [RESULT.WIN]: {
+    [SHAPE.ROCK]: SHAPE.PAPER,
+    [SHAPE.PAPER]: SHAPE.SCISSORS,
+    [SHAPE.SCISSORS]: SHAPE.ROCK,
+  },
 };
 
 const rounds = input
@@ -42,8 +66,8 @@ const rounds = input
   .map((round) => {
     const [them, us] = round.split(" ");
     return {
-      them,
-      us,
+      them: them as ShapeInput,
+      us: us as StrategyInput,
     };
   });
 
@@ -52,17 +76,12 @@ let myScore = 0;
 for (const round of rounds) {
   const { them, us } = round;
 
-  const ourStrategy = STRATEGY_MAP[us as keyof typeof STRATEGY_MAP];
-  const theirShape = RESULT_MATRIX[them as keyof typeof RESULT_MATRIX];
+  const ourShape = SHAPE_BY_STRATEGY[STRATEGY_MAP[us]][
+    SHAPE_MAP[them]
+  ] as Shape;
 
-  const ourShape = Object.keys(theirShape).find(
-    (key) => theirShape[key] === ourStrategy
-  );
-
-  const shapeValue = SHAPE_VALUE[ourShape as keyof typeof SHAPE_VALUE];
-  myScore += shapeValue;
-  const resultValue = WIN_MATRIX[ourShape][them];
-  myScore += resultValue;
-
-  console.log({ shapeValue, myScore, resultValue });
+  myScore += POINTS_BY_SHAPE[ourShape];
+  myScore += POINTS_BY_RESULT[STRATEGY_MAP[us]];
 }
+
+console.log({ myScore });
