@@ -1,6 +1,6 @@
 const input = await Deno.readTextFile("./07-input.txt");
 
-const lines = input.trim().split("\n");
+const lines = input.trim().split("$ ").filter(Boolean);
 
 const FILE_NODE_TYPE = {
   DIR: "DIR",
@@ -8,23 +8,24 @@ const FILE_NODE_TYPE = {
 } as const;
 
 const UP = "..";
+const DIR = "dir";
 
-type FileNodeType = typeof FILE_NODE_TYPE[keyof typeof FILE_NODE_TYPE];
+type NodeType = typeof FILE_NODE_TYPE[keyof typeof FILE_NODE_TYPE];
 
-type FileNodeConstructorOptions = {
+type NodeConstructorOptions = {
   name: string;
-  type: FileNodeType;
+  type: NodeType;
   size?: number;
 };
 
-class FileNode {
+class Node {
   name: string;
-  type: FileNodeType;
+  type: NodeType;
   size?: number;
-  parent?: FileNode;
-  children?: FileNode[];
+  parent?: Node;
+  children?: Node[];
 
-  constructor({ name, type, size }: FileNodeConstructorOptions) {
+  constructor({ name, type, size }: NodeConstructorOptions) {
     this.name = name;
     this.type = type;
     this.size = size;
@@ -46,128 +47,144 @@ class FileNode {
     return this.size;
   }
 
-  addChild(fileNode: FileNode) {
+  addChild(node: Node) {
     if (!this.children) {
       this.children = [];
     }
 
-    this.children.push(fileNode);
+    this.children.push(node);
   }
 
-  setParent(fileNode: FileNode) {
-    this.parent = fileNode;
+  setParent(node: Node) {
+    this.parent = node;
   }
 }
 
-const COMMAND = {
-  CHANGE_DIRECTORY: "cd",
-  LIST: "ls",
-} as const;
-
-const root = new FileNode({
+const root = new Node({
   name: "/",
   type: FILE_NODE_TYPE.DIR,
 });
 
 function main() {
-  let currentFileNode = root;
+  let currentNode = root;
 
-  for (const line of lines) {
-    const isCommand = line.startsWith("$");
+  for (const line of lines.slice(1)) {
+    const parsedLine = line.split("\n").filter(Boolean);
 
-    if (isCommand) {
-      const [_, command, arg] = line.split(" ");
+    const isChangeDirectoryCommand = parsedLine[0].startsWith("cd");
 
-      switch (command) {
-        case COMMAND.CHANGE_DIRECTORY:
-          console.log({
-            currentFileNodeName: currentFileNode.getName(),
-            changingTo: arg,
-          });
-          currentFileNode = changeDirectory({
-            currentFileNode,
-            directoryName: arg,
-          });
-          break;
-        case COMMAND.LIST:
-          console.log("listing directory");
-          break;
-        default:
-          break;
+    if (isChangeDirectoryCommand) {
+      const targetDirectory = parsedLine[0].split(" ")[1];
+
+      const newDirectory = changeDirectory({
+        currentNode,
+        name: targetDirectory,
+      });
+
+      if (!newDirectory) throw new Error("Directory not found");
+
+      currentNode = newDirectory;
+    } else {
+      const directoryList = parsedLine.slice(1);
+
+      for (const item of directoryList) {
+        const [sizeOrDirectory, name] = item.split(" ").filter(Boolean);
+
+        const isDirectory = sizeOrDirectory.startsWith(DIR);
+
+        const existingChild = findChild({
+          children: currentNode.getChildren(),
+          name,
+        });
+
+        if (!existingChild) {
+          if (isDirectory) {
+            makeChildDirectory({
+              currentNode,
+              name,
+            });
+          } else {
+            makeChildFile({
+              currentNode,
+              name,
+              size: parseInt(sizeOrDirectory, 10),
+            });
+          }
+        }
       }
     }
   }
+
+  console.log(root);
 }
 
 main();
 
-type ChangeDirectoryArgs = {
-  currentFileNode: FileNode;
-  directoryName: string;
+type CommandArgs = {
+  currentNode: Node;
+  name: string;
 };
 
-function changeDirectory({
-  currentFileNode,
-  directoryName,
-}: ChangeDirectoryArgs) {
-  if (directoryName === UP) {
-    const parent = currentFileNode.getParent();
-
-    if (parent) {
-      return parent;
-    }
-
-    return root;
+function changeDirectory({ currentNode, name }: CommandArgs) {
+  if (name === UP) {
+    return currentNode.getParent();
   }
 
-  const children = currentFileNode.getChildren();
+  const children = currentNode.getChildren();
 
-  if (!children) {
-    return makeChildDirectory({
-      currentFileNode,
-      directoryName,
-    });
-  }
-
-  return childIfExists({
+  const child = findChild({
     children,
-    currentFileNode,
-    directoryName,
+    name,
   });
+
+  return child;
 }
 
-type ChildIfExistsArgs = {
-  children: FileNode[];
-  currentFileNode: FileNode;
-  directoryName: string;
-};
-
-function childIfExists({
-  children,
-  currentFileNode,
-  directoryName,
-}: ChildIfExistsArgs) {
-  const targetChild = children.find(
-    (child) => child.getName() === directoryName
-  );
-
-  if (targetChild) {
-    return targetChild;
-  }
-
-  return currentFileNode;
-}
-
-function makeChildDirectory({
-  currentFileNode,
-  directoryName,
-}: ChangeDirectoryArgs) {
-  const newNode = new FileNode({
-    name: directoryName,
+function makeChildDirectory({ currentNode, name }: CommandArgs) {
+  return makeChild({
+    currentNode,
+    name,
     type: FILE_NODE_TYPE.DIR,
   });
+}
 
-  newNode.setParent(currentFileNode);
+function makeChildFile({
+  currentNode,
+  name,
+  size,
+}: CommandArgs & { size: number }) {
+  return makeChild({
+    currentNode,
+    name,
+    type: FILE_NODE_TYPE.FILE,
+    size,
+  });
+}
+
+type FindChildArgs = {
+  children?: Node[];
+  name: string;
+};
+
+function findChild({ children, name }: FindChildArgs) {
+  return children?.find((child) => child.getName() === name);
+}
+
+type MakeChildArgs = CommandArgs & {
+  type: NodeType;
+  size?: number;
+};
+
+function makeChild({ currentNode, name, type, size }: MakeChildArgs) {
+  const newNode = new Node({
+    name,
+    type,
+    size,
+  });
+
+  currentNode.addChild(newNode);
+
+  newNode.setParent(currentNode);
 
   return newNode;
 }
