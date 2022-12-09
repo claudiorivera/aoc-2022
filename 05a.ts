@@ -31,22 +31,18 @@ for (const row in rows) {
 for (const instruction of instructions) {
   const [qty, from, to] = parseInstruction(instruction);
 
-  moveCrates({
-    qty,
-    from,
-    to,
-  });
+  moveCrates(qty, from, to);
 }
 
-function moveCrates({
-  qty,
-  from,
-  to,
-}: {
-  qty: number;
-  from: number;
-  to: number;
-}) {
+const result = [];
+
+for (const stack of stacks) {
+  result.push(stack.pop());
+}
+
+console.log(result.join(""));
+
+function moveCrates(qty: number, from: number, to: number) {
   for (let i = 0; i < qty; i++) {
     const crate = stacks[from - 1].pop();
     stacks[to - 1] = [...stacks[to - 1], crate];
