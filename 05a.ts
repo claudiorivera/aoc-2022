@@ -28,4 +28,37 @@ for (const row in rows) {
   }
 }
 
-console.log({ stacks });
+for (const instruction of instructions) {
+  const [qty, from, to] = parseInstruction(instruction);
+
+  moveCrates({
+    qty,
+    from,
+    to,
+  });
+}
+
+function moveCrates({
+  qty,
+  from,
+  to,
+}: {
+  qty: number;
+  from: number;
+  to: number;
+}) {
+  for (let i = 0; i < qty; i++) {
+    const crate = stacks[from - 1].pop();
+    stacks[to - 1] = [...stacks[to - 1], crate];
+  }
+}
+
+function parseInstruction(instruction: string) {
+  const result = instruction.split(" ");
+
+  const quantity = Number(result[1]);
+  const from = Number(result[3]);
+  const to = Number(result[5]);
+
+  return [quantity, from, to];
+}
