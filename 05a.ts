@@ -10,17 +10,19 @@ const rows = crateInput.split("\n").filter(Boolean).slice(0, -1).reverse();
 
 const stacks = new Array(NUMBER_OF_COLUMNS).fill([]);
 
-for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-  const regex = /(.{4}|.{3})/g;
+for (const row in rows) {
+  const rowIndex = Number(row);
 
-  const rowOfCrates = rows[rowIndex].match(regex);
+  const columns = rows[rowIndex]
+    .match(/(.{4}|.{3})/g)
+    ?.map((column) => column.trim());
 
-  if (!rowOfCrates) throw new Error("Unable to parse crates");
+  const parsedColumns = columns?.map((column) => column.replace(/\W/g, ""));
 
-  const columns = rowOfCrates.map((row) => row.replace(/\W/g, ""));
+  for (const column in parsedColumns) {
+    const colIndex = Number(column);
 
-  for (let colIndex = 0; colIndex < columns.length; colIndex++) {
-    const crate = columns[colIndex];
+    const crate = parsedColumns[colIndex];
 
     if (crate !== "") stacks[colIndex] = [...stacks[colIndex], crate];
   }
