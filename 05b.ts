@@ -4,7 +4,7 @@ const [crateInput, instructionsInput] = input.split("\n\n");
 const NUMBER_OF_COLUMNS = 9;
 const instructions = instructionsInput.split("\n").filter(Boolean);
 const crates = crateInput.split("\n").filter(Boolean).slice(0, -1).reverse();
-const stacks = new Array(NUMBER_OF_COLUMNS).fill([]);
+const stacks = new Array(NUMBER_OF_COLUMNS).fill([]) as Array<Array<string>>;
 
 main();
 
@@ -44,10 +44,17 @@ function buildInitialStacks() {
 }
 
 function moveCrates(qty: number, from: number, to: number) {
+  const cratesToMove: Array<string> = [];
+
   for (let i = 0; i < qty; i++) {
-    const crate = stacks[from - 1].pop();
-    stacks[to - 1] = [...stacks[to - 1], crate];
+    const crateToPop = stacks[from - 1].pop();
+
+    if (!crateToPop) throw new Error("No crate to pop");
+
+    cratesToMove.push(crateToPop);
   }
+
+  stacks[to - 1] = [...stacks[to - 1], ...cratesToMove.reverse()];
 }
 
 function parseInstruction(instruction: string) {
