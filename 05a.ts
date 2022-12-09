@@ -8,21 +8,22 @@ const instructions = instructionsInput.split("\n").filter(Boolean);
 
 const rows = crateInput.split("\n").filter(Boolean).slice(0, -1).reverse();
 
-const columns = new Array(NUMBER_OF_COLUMNS).fill([]);
+const stacks = new Array(NUMBER_OF_COLUMNS).fill([]);
 
-for (const i in rows) {
+for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
   const regex = /(.{4}|.{3})/g;
-  const rowOfCrates = rows[i].match(regex);
+
+  const rowOfCrates = rows[rowIndex].match(regex);
 
   if (!rowOfCrates) throw new Error("Unable to parse crates");
 
-  const crates = rowOfCrates.map((row) => row.replace(/\W/g, ""));
-  console.log({ crates });
+  const columns = rowOfCrates.map((row) => row.replace(/\W/g, ""));
 
-  for (const crate of crates) {
-    const colIndex = crates.indexOf(crate);
-    columns[colIndex][i] = crate;
-    console.log({ crate, colIndex, crates, rows });
+  for (let colIndex = 0; colIndex < columns.length; colIndex++) {
+    const crate = columns[colIndex];
+
+    if (crate !== "") stacks[colIndex] = [...stacks[colIndex], crate];
   }
 }
-console.log({ columns });
+
+console.log({ stacks });
