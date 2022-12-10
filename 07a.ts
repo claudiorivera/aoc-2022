@@ -42,12 +42,20 @@ class Node {
     }
   }
 
-  addChild(node: Node) {
+  makeChild(name: string, type: NodeType, size?: number) {
+    const newNode = new Node({
+      name,
+      type,
+      size,
+    });
+
     if (!this.children) {
       this.children = [];
     }
 
-    this.children.push(node);
+    this.children.push(newNode);
+
+    newNode.parent = this;
   }
 
   findChildByName(name: string) {
@@ -103,13 +111,12 @@ function formatTree(node: Node, depth = 0) {
   const { name, type } = node;
   const size = node.getSize();
 
-  let output = "";
+  const nodeDetails = (type: NodeType) =>
+    `${"  ".repeat(depth)} - ${name} (${type}, size=${size})\n`;
 
-  if (type === NODE_TYPE.FILE) {
-    output += `${"  ".repeat(depth)} - ${name} (file, size=${size})\n`;
-  } else {
-    output += `${"  ".repeat(depth)} - ${name} (${DIRECTORY}, size=${size})\n`;
+  let output = nodeDetails(type);
 
+  if (type === NODE_TYPE.DIR) {
     const children = node.children;
 
     if (children?.length) {
@@ -131,35 +138,25 @@ function createFileSystem(root: Node) {
     const isChangeDirectoryCommand = parsedLine.length === 1;
 
     if (isChangeDirectoryCommand) {
-      const targetDirectory = parsedLine[0].split(" ")[1];
-
-      const newDirectory = changeDirectory({
+      const targetDirectory = changeDirectory(
         currentNode,
-        name: targetDirectory,
-      });
+        parsedLine[0].split(" ")[1]
+      );
 
-      if (!newDirectory) throw new Error("Could not change directory 😅");
+      if (!targetDirectory) throw new Error("Could not change directory 😅");
 
-      currentNode = newDirectory;
+      currentNode = targetDirectory;
     } else {
       const directoryList = parsedLine.slice(1);
 
       for (const item of directoryList) {
-        handleDirectoryListItem({ item, currentNode });
+        handleDirectoryListItem(currentNode, item);
       }
     }
   }
 }
 
-type HandleDirectoryListItemArgs = {
-  item: string;
-  currentNode: Node;
-};
-
-function handleDirectoryListItem({
-  item,
-  currentNode,
-}: HandleDirectoryListItemArgs) {
+function handleDirectoryListItem(currentNode: Node, item: string) {
   const [sizeOrDirectory, name] = item.split(" ");
 
   const isDirectory = sizeOrDirectory.startsWith(DIRECTORY);
@@ -168,71 +165,19 @@ function handleDirectoryListItem({
 
   if (existingChild) return;
 
-  if (isDirectory) {
-    makeChildDirectory({
-      currentNode,
-      name,
-    });
-  } else {
-    makeChildFile({
-      currentNode,
-      name,
-      size: parseInt(sizeOrDirectory),
-    });
-  }
+  currentNode.makeChild(
+    name,
+    isDirectory ? NODE_TYPE.DIR : NODE_TYPE.FILE,
+    parseInt(sizeOrDirectory)
+  );
 }
 
-type CommandArgs = {
-  currentNode: Node;
-  name: string;
-};
-
-function changeDirectory({ currentNode, name }: CommandArgs) {
-  if (name === UP) {
+function changeDirectory(currentNode: Node, targetDirectory: string) {
+  if (targetDirectory === UP) {
     return currentNode.parent;
   }
 
-  const child = currentNode.findChildByName(name);
+  const child = currentNode.findChildByName(targetDirectory);
 
   return child;
-}
-
-function makeChildDirectory({ currentNode, name }: CommandArgs) {
-  return makeChild({
-    currentNode,
-    name,
-    type: NODE_TYPE.DIR,
-  });
-}
-
-function makeChildFile({
-  currentNode,
-  name,
-  size,
-}: CommandArgs & { size: number }) {
-  return makeChild({
-    currentNode,
-    name,
-    type: NODE_TYPE.FILE,
-    size,
-  });
-}
-
-type MakeChildArgs = CommandArgs & {
-  type: NodeType;
-  size?: number;
-};
-
-function makeChild({ currentNode, name, type, size }: MakeChildArgs) {
-  const newNode = new Node({
-    name,
-    type,
-    size,
-  });
-
-  currentNode.addChild(newNode);
-
-  newNode.parent = currentNode;
-
-  return newNode;
 }
