@@ -81,9 +81,42 @@ function main() {
   createFileSystem();
 
   console.log(formatTree(root));
+
+  const smallDirectories = findSmallDirectories(root);
+
+  const totalSizeOfSmallDirectories = smallDirectories.reduce(
+    (acc, cur) => acc + cur.getSize(),
+    0
+  );
+
+  console.log({ totalSizeOfSmallDirectories });
 }
 
 main();
+
+function findSmallDirectories(node: Node): Node[] {
+  const smallDirectories = [];
+
+  if (node.getType() === FILE_NODE_TYPE.DIR) {
+    const isSmallDirectory = node.getSize() < SMALL_FILE_LIMIT;
+
+    if (isSmallDirectory) {
+      smallDirectories.push(node);
+    }
+
+    const children = node.getChildren();
+
+    if (children?.length) {
+      for (const child of children) {
+        const childSmallDirectories = findSmallDirectories(child);
+
+        smallDirectories.push(...childSmallDirectories);
+      }
+    }
+  }
+
+  return smallDirectories;
+}
 
 function formatTree(node: Node, depth = 0) {
   const size = node.getSize();
