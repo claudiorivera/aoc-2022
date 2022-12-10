@@ -9,6 +9,7 @@ const FILE_NODE_TYPE = {
 
 const UP = "..";
 const DIR = "dir";
+const SMALL_FILE_LIMIT = 100_000;
 
 type NodeType = typeof FILE_NODE_TYPE[keyof typeof FILE_NODE_TYPE];
 
@@ -19,20 +20,25 @@ type NodeConstructorOptions = {
 };
 
 class Node {
-  name: string;
-  type: NodeType;
-  size?: number;
-  parent?: Node;
-  children?: Node[];
+  private name: string;
+  private type: NodeType;
+  private size?: number;
+  private parent?: Node;
+  private children: Node[];
 
   constructor({ name, type, size }: NodeConstructorOptions) {
     this.name = name;
     this.type = type;
     this.size = size;
+    this.children = [];
   }
 
   getName() {
     return this.name;
+  }
+
+  getType() {
+    return this.type;
   }
 
   getChildren() {
@@ -43,20 +49,26 @@ class Node {
     return this.parent;
   }
 
-  getSize() {
-    return this.size;
+  getSize(): number {
+    if (this.type === FILE_NODE_TYPE.FILE) {
+      return this.size ?? 0;
+    } else {
+      return this.children.reduce((acc, child) => acc + child.getSize(), 0);
+    }
   }
 
   addChild(node: Node) {
-    if (!this.children) {
-      this.children = [];
-    }
-
     this.children.push(node);
   }
 
   setParent(node: Node) {
     this.parent = node;
+  }
+
+  findChildByName(name: string) {
+    const foundChild = this.children?.find((child) => child.getName() === name);
+
+    return foundChild;
   }
 }
 
@@ -66,12 +78,44 @@ const root = new Node({
 });
 
 function main() {
+  createFileSystem();
+
+  console.log(formatTree(root));
+}
+
+main();
+
+function formatTree(node: Node, depth = 0) {
+  const size = node.getSize();
+  const name = node.getName();
+  const type = node.getType();
+
+  let output = "";
+
+  if (type === FILE_NODE_TYPE.FILE) {
+    output += `${"  ".repeat(depth)} - ${name} (file, size=${size})\n`;
+  } else if (type === FILE_NODE_TYPE.DIR) {
+    output += `${"  ".repeat(depth)} - ${name} (${DIR}, size=${size})\n`;
+
+    const children = node.getChildren();
+
+    if (children?.length) {
+      output += `${children
+        .map((child) => formatTree(child, depth + 1))
+        .join("")}`;
+    }
+  }
+
+  return output;
+}
+
+function createFileSystem() {
   let currentNode = root;
 
   for (const line of lines.slice(1)) {
     const parsedLine = line.split("\n").filter(Boolean);
 
-    const isChangeDirectoryCommand = parsedLine[0].startsWith("cd");
+    const isChangeDirectoryCommand = parsedLine.length === 1;
 
     if (isChangeDirectoryCommand) {
       const targetDirectory = parsedLine[0].split(" ")[1];
@@ -92,10 +136,7 @@ function main() {
 
         const isDirectory = sizeOrDirectory.startsWith(DIR);
 
-        const existingChild = findChild({
-          children: currentNode.getChildren(),
-          name,
-        });
+        const existingChild = currentNode.findChildByName(name);
 
         if (!existingChild) {
           if (isDirectory) {
@@ -114,11 +155,7 @@ function main() {
       }
     }
   }
-
-  console.log(root);
 }
-
-main();
 
 type CommandArgs = {
   currentNode: Node;
@@ -130,12 +167,7 @@ function changeDirectory({ currentNode, name }: CommandArgs) {
     return currentNode.getParent();
   }
 
-  const children = currentNode.getChildren();
-
-  const child = findChild({
-    children,
-    name,
-  });
+  const child = currentNode.findChildByName(name);
 
   return child;
 }
@@ -159,15 +191,6 @@ function makeChildFile({
     type: FILE_NODE_TYPE.FILE,
     size,
   });
-}
-
-type FindChildArgs = {
-  children?: Node[];
-  name: string;
-};
-
-function findChild({ children, name }: FindChildArgs) {
-  return children?.find((child) => child.getName() === name);
 }
 
 type MakeChildArgs = CommandArgs & {
