@@ -2,16 +2,16 @@ const input = await Deno.readTextFile("./07-input.txt");
 
 const lines = input.trim().split("$ ").filter(Boolean);
 
-const FILE_NODE_TYPE = {
+const NODE_TYPE = {
   DIR: "DIR",
   FILE: "FILE",
 } as const;
 
 const UP = "..";
-const DIR = "dir";
+const DIRECTORY = "dir";
 const SMALL_FILE_LIMIT = 100_000;
 
-type NodeType = typeof FILE_NODE_TYPE[keyof typeof FILE_NODE_TYPE];
+type NodeType = typeof NODE_TYPE[keyof typeof NODE_TYPE];
 
 type NodeConstructorOptions = {
   name: string;
@@ -20,71 +20,52 @@ type NodeConstructorOptions = {
 };
 
 class Node {
-  private name: string;
-  private type: NodeType;
+  name: string;
+  type: NodeType;
   private size?: number;
-  private parent?: Node;
-  private children: Node[];
+  parent?: Node;
+  children?: Node[];
 
   constructor({ name, type, size }: NodeConstructorOptions) {
     this.name = name;
     this.type = type;
     this.size = size;
-    this.children = [];
-  }
-
-  getName() {
-    return this.name;
-  }
-
-  getType() {
-    return this.type;
-  }
-
-  getChildren() {
-    return this.children;
-  }
-
-  getParent() {
-    return this.parent;
   }
 
   getSize(): number {
-    if (this.type === FILE_NODE_TYPE.FILE) {
+    if (this.type === NODE_TYPE.FILE) {
       return this.size ?? 0;
     } else {
+      if (!this.children) return 0;
+
       return this.children.reduce((acc, child) => acc + child.getSize(), 0);
     }
   }
 
   addChild(node: Node) {
+    if (!this.children) {
+      this.children = [];
+    }
+
     this.children.push(node);
   }
 
-  setParent(node: Node) {
-    this.parent = node;
-  }
-
   findChildByName(name: string) {
-    const foundChild = this.children?.find((child) => child.getName() === name);
-
-    return foundChild;
+    return this.children?.find((child) => child.name === name);
   }
 }
 
-const root = new Node({
-  name: "/",
-  type: FILE_NODE_TYPE.DIR,
-});
-
 function main() {
-  createFileSystem();
+  const root = new Node({
+    name: "/",
+    type: NODE_TYPE.DIR,
+  });
+
+  createFileSystem(root);
 
   console.log(formatTree(root));
 
-  const smallDirectories = findSmallDirectories(root);
-
-  const totalSizeOfSmallDirectories = smallDirectories.reduce(
+  const totalSizeOfSmallDirectories = findSmallDirectories(root).reduce(
     (acc, cur) => acc + cur.getSize(),
     0
   );
@@ -97,14 +78,14 @@ main();
 function findSmallDirectories(node: Node): Node[] {
   const smallDirectories = [];
 
-  if (node.getType() === FILE_NODE_TYPE.DIR) {
+  if (node.type === NODE_TYPE.DIR) {
     const isSmallDirectory = node.getSize() < SMALL_FILE_LIMIT;
 
     if (isSmallDirectory) {
       smallDirectories.push(node);
     }
 
-    const children = node.getChildren();
+    const children = node.children;
 
     if (children?.length) {
       for (const child of children) {
@@ -119,18 +100,17 @@ function findSmallDirectories(node: Node): Node[] {
 }
 
 function formatTree(node: Node, depth = 0) {
+  const { name, type } = node;
   const size = node.getSize();
-  const name = node.getName();
-  const type = node.getType();
 
   let output = "";
 
-  if (type === FILE_NODE_TYPE.FILE) {
+  if (type === NODE_TYPE.FILE) {
     output += `${"  ".repeat(depth)} - ${name} (file, size=${size})\n`;
-  } else if (type === FILE_NODE_TYPE.DIR) {
-    output += `${"  ".repeat(depth)} - ${name} (${DIR}, size=${size})\n`;
+  } else {
+    output += `${"  ".repeat(depth)} - ${name} (${DIRECTORY}, size=${size})\n`;
 
-    const children = node.getChildren();
+    const children = node.children;
 
     if (children?.length) {
       output += `${children
@@ -142,7 +122,7 @@ function formatTree(node: Node, depth = 0) {
   return output;
 }
 
-function createFileSystem() {
+function createFileSystem(root: Node) {
   let currentNode = root;
 
   for (const line of lines.slice(1)) {
@@ -158,35 +138,47 @@ function createFileSystem() {
         name: targetDirectory,
       });
 
-      if (!newDirectory) throw new Error("Directory not found");
+      if (!newDirectory) throw new Error("Could not change directory 😅");
 
       currentNode = newDirectory;
     } else {
       const directoryList = parsedLine.slice(1);
 
       for (const item of directoryList) {
-        const [sizeOrDirectory, name] = item.split(" ").filter(Boolean);
-
-        const isDirectory = sizeOrDirectory.startsWith(DIR);
-
-        const existingChild = currentNode.findChildByName(name);
-
-        if (!existingChild) {
-          if (isDirectory) {
-            makeChildDirectory({
-              currentNode,
-              name,
-            });
-          } else {
-            makeChildFile({
-              currentNode,
-              name,
-              size: parseInt(sizeOrDirectory, 10),
-            });
-          }
-        }
+        handleDirectoryListItem({ item, currentNode });
       }
     }
+  }
+}
+
+type HandleDirectoryListItemArgs = {
+  item: string;
+  currentNode: Node;
+};
+
+function handleDirectoryListItem({
+  item,
+  currentNode,
+}: HandleDirectoryListItemArgs) {
+  const [sizeOrDirectory, name] = item.split(" ");
+
+  const isDirectory = sizeOrDirectory.startsWith(DIRECTORY);
+
+  const existingChild = currentNode.findChildByName(name);
+
+  if (existingChild) return;
+
+  if (isDirectory) {
+    makeChildDirectory({
+      currentNode,
+      name,
+    });
+  } else {
+    makeChildFile({
+      currentNode,
+      name,
+      size: parseInt(sizeOrDirectory),
+    });
   }
 }
 
@@ -197,7 +189,7 @@ type CommandArgs = {
 
 function changeDirectory({ currentNode, name }: CommandArgs) {
   if (name === UP) {
-    return currentNode.getParent();
+    return currentNode.parent;
   }
 
   const child = currentNode.findChildByName(name);
@@ -209,7 +201,7 @@ function makeChildDirectory({ currentNode, name }: CommandArgs) {
   return makeChild({
     currentNode,
     name,
-    type: FILE_NODE_TYPE.DIR,
+    type: NODE_TYPE.DIR,
   });
 }
 
@@ -221,7 +213,7 @@ function makeChildFile({
   return makeChild({
     currentNode,
     name,
-    type: FILE_NODE_TYPE.FILE,
+    type: NODE_TYPE.FILE,
     size,
   });
 }
@@ -240,7 +232,7 @@ function makeChild({ currentNode, name, type, size }: MakeChildArgs) {
 
   currentNode.addChild(newNode);
 
-  newNode.setParent(currentNode);
+  newNode.parent = currentNode;
 
   return newNode;
 }
