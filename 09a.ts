@@ -1,6 +1,6 @@
 const file = await Deno.readTextFile("./09-sample-input.txt");
 
-const moves = file.split("\n").filter(Boolean);
+const inputLines = file.split("\n").filter(Boolean);
 
 type Position = {
   x: number;
@@ -24,24 +24,23 @@ const ROPE_NODE_TYPE = {
 type RopeNodeType = typeof ROPE_NODE_TYPE[keyof typeof ROPE_NODE_TYPE];
 
 class RopeNode {
-  currentPosition: Position = { x: 0, y: 0 };
+  currentPosition: Position;
   nextPosition?: Position;
   type: RopeNodeType;
   positionsVisited: Set<Position> = new Set();
 
   constructor(type: RopeNodeType) {
     this.type = type;
-  }
-
-  move() {
-    return;
+    const initialPosition = { x: 0, y: 0 };
+    this.currentPosition = initialPosition;
+    this.positionsVisited.add(initialPosition);
   }
 
   getNumberOfPositionsVisited() {
     return this.positionsVisited.size;
   }
 
-  private visitPosition(position: Position) {
+  visitPosition(position: Position) {
     this.positionsVisited.add(position);
   }
 }
@@ -58,15 +57,20 @@ class Rope {
   executeMove(move: Move) {
     const { direction, distance } = move;
 
-    // this.tail.nextPosition = this.head.currentPosition;
-    // this.head.nextPosition = this.getNextPosition(
-    //   this.head.currentPosition,
-    //   direction,
-    //   distance
-    // );
+    for (let i = 0; i < distance; i++) {
+      this.moveHeadOneSpace(direction);
+    }
+  }
 
-    // this.head.move();
-    // this.tail.move();
+  private moveHeadOneSpace(direction: Direction) {
+    const nextHeadPosition = this.getNextPosition(
+      this.head.currentPosition,
+      direction,
+      1
+    );
+    this.head.currentPosition = nextHeadPosition;
+    this.head.visitPosition(nextHeadPosition);
+    this.head.nextPosition = undefined;
   }
 
   private getNextPosition(
@@ -148,17 +152,20 @@ class Move {
 
 function main() {
   const rope = new Rope();
+  const moveParser = new MoveParser();
 
-  const parsedMoves = moves.map((move) => {
-    const moveParser = new MoveParser();
-    return moveParser.parse(move);
+  const moves = inputLines.map((line) => {
+    return moveParser.parse(line);
   });
 
-  for (const move of parsedMoves) {
+  for (const move of moves) {
     rope.executeMove(move);
   }
 
-  console.log(rope.tail.getNumberOfPositionsVisited());
+  console.log({
+    positions: rope.head.positionsVisited,
+    numberOfPositions: rope.head.getNumberOfPositionsVisited(),
+  });
 }
 
 main();
