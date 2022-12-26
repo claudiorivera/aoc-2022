@@ -1,4 +1,4 @@
-const file = await Deno.readTextFile("./09-sample-input.txt");
+const file = await Deno.readTextFile("./09-input.txt");
 
 const inputLines = file.split("\n").filter(Boolean);
 
@@ -16,24 +16,15 @@ const DIRECTION = {
 
 type Direction = typeof DIRECTION[keyof typeof DIRECTION];
 
-const ROPE_NODE_TYPE = {
-  HEAD: "HEAD",
-  TAIL: "TAIL",
-};
-
-type RopeNodeType = typeof ROPE_NODE_TYPE[keyof typeof ROPE_NODE_TYPE];
-
 class RopeNode {
-  currentPosition: Position;
-  nextPosition?: Position;
-  type: RopeNodeType;
-  positionsVisited: Set<Position> = new Set();
+  position: Position;
+  positionsVisited: Set<string>;
 
-  constructor(type: RopeNodeType) {
-    this.type = type;
+  constructor() {
     const initialPosition = { x: 0, y: 0 };
-    this.currentPosition = initialPosition;
-    this.positionsVisited.add(initialPosition);
+    this.position = initialPosition;
+    this.positionsVisited = new Set();
+    this.positionsVisited.add(this.positionToString(initialPosition));
   }
 
   getNumberOfPositionsVisited() {
@@ -41,40 +32,108 @@ class RopeNode {
   }
 
   visitPosition(position: Position) {
-    this.positionsVisited.add(position);
+    this.position = position;
+    this.positionsVisited.add(this.positionToString(position));
+  }
+
+  private positionToString(position: Position) {
+    return `${position.x},${position.y}`;
   }
 }
 
 class Rope {
-  head: RopeNode;
-  tail: RopeNode;
-
-  constructor() {
-    this.head = new RopeNode(ROPE_NODE_TYPE.HEAD);
-    this.tail = new RopeNode(ROPE_NODE_TYPE.TAIL);
-  }
+  head = new RopeNode();
+  tail = new RopeNode();
 
   executeMove(move: Move) {
     const { direction, distance } = move;
 
     for (let i = 0; i < distance; i++) {
-      this.moveHeadOneSpace(direction);
+      this.moveOrthogonaly(direction, this.head);
+
+      if (!this.isTailAdjacentToHead()) {
+        this.moveTail(direction);
+      }
     }
   }
 
-  private moveHeadOneSpace(direction: Direction) {
-    const nextHeadPosition = this.getNextPosition(
-      this.head.currentPosition,
+  private moveTail(direction: Direction) {
+    if (this.isTailOrthoginalToHead()) {
+      this.moveOrthogonaly(direction, this.tail);
+    } else {
+      this.moveDiagonally();
+    }
+  }
+
+  private moveDiagonally() {
+    const nextPosition = this.getNextDiagonalPosition();
+
+    this.tail.visitPosition(nextPosition);
+  }
+
+  private getNextDiagonalPosition() {
+    const nextPosition = {
+      ...this.tail.position,
+    };
+
+    if (this.head.position.x > this.tail.position.x) {
+      nextPosition.x += 1;
+    } else if (this.head.position.x < this.tail.position.x) {
+      nextPosition.x -= 1;
+    }
+
+    if (this.head.position.y > this.tail.position.y) {
+      nextPosition.y += 1;
+    } else if (this.head.position.y < this.tail.position.y) {
+      nextPosition.y -= 1;
+    }
+
+    return nextPosition;
+  }
+
+  private isTailDiagonalToHead() {
+    return (
+      Math.abs(this.head.position.x - this.tail.position.x) === 1 &&
+      Math.abs(this.head.position.y - this.tail.position.y) === 1
+    );
+  }
+
+  private isTailOrthoginalToHead() {
+    return (
+      (this.head.position.x === this.tail.position.x &&
+        Math.abs(this.head.position.y - this.tail.position.y) === 1) ||
+      (this.head.position.y === this.tail.position.y &&
+        Math.abs(this.head.position.x - this.tail.position.x) === 1)
+    );
+  }
+
+  private isTailEqualToHead() {
+    return (
+      this.head.position.x === this.tail.position.x &&
+      this.head.position.y === this.tail.position.y
+    );
+  }
+
+  private isTailAdjacentToHead() {
+    return (
+      this.isTailDiagonalToHead() ||
+      this.isTailOrthoginalToHead() ||
+      this.isTailEqualToHead()
+    );
+  }
+
+  private moveOrthogonaly(direction: Direction, node: RopeNode) {
+    const nextPosition = this.getNextOrthoginalPosition(
+      node.position,
       direction,
       1
     );
-    this.head.currentPosition = nextHeadPosition;
-    this.head.visitPosition(nextHeadPosition);
-    this.head.nextPosition = undefined;
+
+    node.visitPosition(nextPosition);
   }
 
-  private getNextPosition(
-    currentPosition: Position,
+  private getNextOrthoginalPosition(
+    position: Position,
     direction: Direction,
     distance: number
   ) {
@@ -83,26 +142,26 @@ class Rope {
     switch (direction) {
       case DIRECTION.UP:
         nextPosition = {
-          x: currentPosition.x,
-          y: currentPosition.y + distance,
+          x: position.x,
+          y: position.y + distance,
         };
         break;
       case DIRECTION.DOWN:
         nextPosition = {
-          x: currentPosition.x,
-          y: currentPosition.y - distance,
+          x: position.x,
+          y: position.y - distance,
         };
         break;
       case DIRECTION.LEFT:
         nextPosition = {
-          x: currentPosition.x - distance,
-          y: currentPosition.y,
+          x: position.x - distance,
+          y: position.y,
         };
         break;
       case DIRECTION.RIGHT:
         nextPosition = {
-          x: currentPosition.x + distance,
-          y: currentPosition.y,
+          x: position.x + distance,
+          y: position.y,
         };
         break;
     }
@@ -162,10 +221,7 @@ function main() {
     rope.executeMove(move);
   }
 
-  console.log({
-    positions: rope.head.positionsVisited,
-    numberOfPositions: rope.head.getNumberOfPositionsVisited(),
-  });
+  console.log(rope.tail.getNumberOfPositionsVisited());
 }
 
 main();
